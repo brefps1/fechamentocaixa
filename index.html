@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Planilha de Fechamento de Caixa</title>
+  <style>
+    :root {
+      --bg: #0f172a;         /* slate-900 */
+      --panel: #111827;      /* gray-900 */
+      --muted: #94a3b8;      /* slate-400 */
+      --text: #e5e7eb;       /* gray-200 */
+      --accent: #22c55e;     /* green-500 */
+      --accent-2: #38bdf8;   /* sky-400 */
+      --danger: #ef4444;     /* red-500 */
+      --warning: #f59e0b;    /* amber-500 */
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 16px;
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif;
+      background: radial-gradient(1000px 600px at 20% 0%, rgba(56,189,248,.12), transparent),
+                  radial-gradient(1200px 700px at 100% 20%, rgba(34,197,94,.10), transparent),
+                  var(--bg);
+      color: var(--text);
+    }
+    .container { max-width: 1100px; margin: 32px auto; padding: 0 16px; }
+    header { display: grid; gap: 12px; margin-bottom: 18px; }
+    h1 { margin: 0; font-weight: 800; letter-spacing: .3px; }
+    .sub { color: var(--muted); font-size: .95rem; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 18px;
+    }
+    @media (max-width: 880px){ .grid{ grid-template-columns: 1fr; } }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .card h2 { margin: 0; font-size: 1.05rem; letter-spacing: .2px; }
+    .card .hd { display:flex; align-items:center; justify-content:space-between; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
+    .card .bd { padding: 14px 16px; }
+
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .row3 { display:grid; grid-template-columns: 1.2fr .8fr .6fr; gap:12px; }
+    @media (max-width:640px){ .row, .row3 { grid-template-columns: 1fr; } }
+
+    label { font-size:.85rem; color:var(--muted); margin-bottom:6px; display:block; }
+    input, select, textarea, button {
+      font: inherit; color: var(--text);
+    }
+    input[type="text"], input[type="number"], select, textarea, input[type="date"] {
+      width: 100%; padding: 12px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.12);
+      background: rgba(2,6,23,.6); outline: none; transition: border .2s, box-shadow .2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: rgba(56,189,248,.6);
+      box-shadow: 0 0 0 4px rgba(56,189,248,.18);
+    }
+
+    .actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .btn {
+      padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.12);
+      background: rgba(56,189,248,.15); color: var(--text); cursor: pointer; transition: transform .05s ease, background .2s;
+    }
+    .btn:hover { background: rgba(56,189,248,.25); }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary { background: linear-gradient(180deg, rgba(34,197,94,.18), rgba(34,197,94,.12)); border-color: rgba(34,197,94,.35); }
+    .btn.warn    { background: linear-gradient(180deg, rgba(245,158,11,.18), rgba(245,158,11,.10)); border-color: rgba(245,158,11,.35); }
+    .btn.danger  { background: linear-gradient(180deg, rgba(239,68,68,.18), rgba(239,68,68,.10)); border-color: rgba(239,68,68,.35); }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th { text-align: left; font-size: .8rem; color: var(--muted); font-weight: 600; letter-spacing:.3px; }
+    th, td { padding: 12px 8px; border-bottom: 1px solid rgba(255,255,255,.08); vertical-align: top; }
+    tbody tr:hover { background: rgba(255,255,255,.03); }
+
+    .tag { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.16); font-size:.78rem; color:#d1fae5; background: rgba(34,197,94,.10); }
+    .tag.saida { color:#fee2e2; background: rgba(239,68,68,.10); }
+
+    .totals { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .kpi { padding: 12px; border-radius: 14px; border:1px solid rgba(255,255,255,.10); background: rgba(2,6,23,.6); }
+    .kpi h3 { margin:0 0 6px 0; font-size:.8rem; color: var(--muted); }
+    .kpi .val { font-weight:800; font-size:1.15rem; }
+
+    .footer { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-top: 8px; color: var(--muted); font-size:.9rem; }
+    .pointer { cursor:pointer; text-decoration: underline; }
+
+    .right { text-align:right; }
+    .muted { color: var(--muted); }
+    .nowrap { white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Planilha de Fechamento de Caixa</h1>
+      <div class="sub">Adicione lançamentos do dia e acompanhe os totais por categoria. Salva automaticamente no navegador (localStorage) por data.</div>
+    </header>
+
+    <div class="grid">
+      <!-- Lado esquerdo: lançamentos -->
+      <section class="card" aria-labelledby="form-title">
+        <div class="hd">
+          <h2 id="form-title">Adicionar lançamento</h2>
+          <div class="actions">
+            <button class="btn" id="printBtn">Imprimir</button>
+            <button class="btn" id="exportBtn">Exportar CSV</button>
+          </div>
+        </div>
+        <div class="bd">
+          <div class="row">
+            <div>
+              <label for="date">Data</label>
+              <input type="date" id="date" />
+            </div>
+            <div>
+              <label for="desc">Descrição (opcional)</label>
+              <input type="text" id="desc" placeholder="Ex.: Venda #1024, Pedido Mesa 7, etc." />
+            </div>
+          </div>
+          <div class="row3" style="margin-top:12px;">
+            <div>
+              <label for="cat">Categoria</label>
+              <select id="cat">
+                <option value="cartao">Cartão</option>
+                <option value="cartao_parcelado">Cartão (Parcelado)</option>
+                <option value="pix_chave">PIX (Chave)</option>
+                <option value="pix_maquina">PIX (Máquina)</option>
+                <option value="convenio">Convênio</option>
+                <option value="prazo">Prazo</option>
+                <option value="sangria_saida">Sangria/Saída</option>
+              </select>
+            </div>
+            <div>
+              <label for="valor">Valor (R$)</label>
+              <input type="text" id="valor" inputmode="decimal" placeholder="0,00" />
+            </div>
+            <div style="display:flex; align-items:flex-end; gap:8px;">
+              <button class="btn primary" id="addBtn" style="width:100%">Adicionar</button>
+              <button class="btn warn" id="clearDescBtn" title="Limpar campos" aria-label="Limpar campos">Limpar</button>
+            </div>
+          </div>
+
+          <div style="margin-top:16px; overflow:auto;">
+            <table id="tbl">
+              <thead>
+                <tr>
+                  <th style="width:120px;">Hora</th>
+                  <th>Categoria</th>
+                  <th>Descrição</th>
+                  <th class="right nowrap">Valor</th>
+                  <th class="right">Ações</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Lado direito: totais -->
+      <aside class="card" aria-labelledby="totais-title">
+        <div class="hd">
+          <h2 id="totais-title">Totais do dia</h2>
+          <div class="muted" id="countInfo">0 lançamentos</div>
+        </div>
+        <div class="bd">
+          <div class="totals">
+            <div class="kpi"><h3>Cartão</h3><div class="val" id="t_cartao">R$ 0,00</div></div>
+            <div class="kpi"><h3>Cartão (Parcelado)</h3><div class="val" id="t_cartao_parcelado">R$ 0,00</div></div>
+            <div class="kpi"><h3>PIX (Chave)</h3><div class="val" id="t_pix_chave">R$ 0,00</div></div>
+            <div class="kpi"><h3>PIX (Máquina)</h3><div class="val" id="t_pix_maquina">R$ 0,00</div></div>
+            <div class="kpi"><h3>Convênio</h3><div class="val" id="t_convenio">R$ 0,00</div></div>
+            <div class="kpi"><h3>Prazo</h3><div class="val" id="t_prazo">R$ 0,00</div></div>
+            <div class="kpi"><h3>Sangria/Saída</h3><div class="val" id="t_sangria_saida">R$ 0,00</div></div>
+          </div>
+
+          <hr style="margin:16px 0; border:none; border-top:1px solid rgba(255,255,255,.08)">
+
+          <div class="totals">
+            <div class="kpi">
+              <h3>Total de Entradas</h3>
+              <div class="val" id="t_entradas">R$ 0,00</div>
+            </div>
+            <div class="kpi">
+              <h3>Total de Saídas</h3>
+              <div class="val" id="t_saidas">R$ 0,00</div>
+            </div>
+            <div class="kpi" style="grid-column: span 2;">
+              <h3>Saldo Final (Entradas − Saídas)</h3>
+              <div class="val" id="t_saldo">R$ 0,00</div>
+            </div>
+          </div>
+
+          <div class="footer">
+            <div>
+              <span class="pointer" id="todayBtn">Ir para hoje</span> ·
+              <span class="pointer" id="clearDayBtn" title="Limpa os lançamentos da data atual">Limpar o dia</span>
+            </div>
+            <div>Dados salvos em <span class="muted">localStorage</span></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    // ======== Util ========
+    const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+    const nowLocalISODate = () => {
+      // Data local no formato YYYY-MM-DD respeitando fuso do navegador
+      const d = new Date();
+      const off = d.getTimezoneOffset();
+      const local = new Date(d.getTime() - off * 60000);
+      return local.toISOString().slice(0,10);
+    };
+
+    const catLabels = {
+      cartao: 'Cartão',
+      cartao_parcelado: 'Cartão (Parcelado)',
+      pix_chave: 'PIX (Chave)',
+      pix_maquina: 'PIX (Máquina)',
+      convenio: 'Convênio',
+      prazo: 'Prazo',
+      sangria_saida: 'Sangria/Saída',
+    };
+
+    const isSaida = (cat) => cat === 'sangria_saida';
+
+    const parseValor = (txt) => {
+      if (typeof txt !== 'string') return 0;
+      // aceita "1.234,56" ou "1234.56" ou "1234" etc
+      const clean = txt.replace(/[^0-9.,-]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
+      const n = Number(clean);
+      return isFinite(n) ? n : 0;
+    };
+
+    const formatValorInput = (el) => {
+      const n = parseValor(el.value);
+      el.value = n === 0 ? '' : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    // ======== Estado/Persistência ========
+    const $date = document.getElementById('date');
+    const $desc = document.getElementById('desc');
+    const $cat  = document.getElementById('cat');
+    const $valor= document.getElementById('valor');
+    const $tbody= document.querySelector('#tbl tbody');
+    const $countInfo = document.getElementById('countInfo');
+
+    const storageKey = (dateStr) => `fechamento_${dateStr}`;
+
+    function loadDay(dateStr){
+      const raw = localStorage.getItem(storageKey(dateStr));
+      try { return raw ? JSON.parse(raw) : []; }
+      catch { return []; }
+    }
+    function saveDay(dateStr, arr){
+      localStorage.setItem(storageKey(dateStr), JSON.stringify(arr));
+    }
+
+    // ======== Render ========
+    function render(){
+      const d = $date.value;
+      const items = loadDay(d);
+      $tbody.innerHTML = '';
+
+      let totals = {
+        cartao: 0, cartao_parcelado: 0, pix_chave: 0, pix_maquina: 0,
+        convenio: 0, prazo: 0, sangria_saida: 0,
+      };
+
+      items.forEach((it, idx) => {
+        if (isSaida(it.cat)) totals.sangria_saida += it.valor; else totals[it.cat] += it.valor;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="muted">${it.hora}</td>
+          <td>
+            <span class="tag ${isSaida(it.cat)?'saida':''}">${catLabels[it.cat]}</span>
+          </td>
+          <td>${it.desc ? it.desc.replace(/</g,'&lt;') : '<span class="muted">—</span>'}</td>
+          <td class="right">${fmt.format(it.valor)}</td>
+          <td class="right">
+            <button class="btn" data-edit="${idx}">Editar</button>
+            <button class="btn danger" data-del="${idx}">Excluir</button>
+          </td>`;
+        $tbody.appendChild(tr);
+      });
+
+      // KPIs
+      const setVal = (id, val) => document.getElementById(id).textContent = fmt.format(val);
+      setVal('t_cartao', totals.cartao);
+      setVal('t_cartao_parcelado', totals.cartao_parcelado);
+      setVal('t_pix_chave', totals.pix_chave);
+      setVal('t_pix_maquina', totals.pix_maquina);
+      setVal('t_convenio', totals.convenio);
+      setVal('t_prazo', totals.prazo);
+      setVal('t_sangria_saida', totals.sangria_saida);
+
+      const entradas = totals.cartao + totals.cartao_parcelado + totals.pix_chave + totals.pix_maquina + totals.convenio + totals.prazo;
+      const saidas   = totals.sangria_saida;
+      setVal('t_entradas', entradas);
+      setVal('t_saidas', saidas);
+      setVal('t_saldo', entradas - saidas);
+
+      $countInfo.textContent = `${items.length} ${items.length===1?'lançamento':'lançamentos'}`;
+
+      // bind actions per row
+      $tbody.querySelectorAll('[data-del]').forEach(btn=> btn.addEventListener('click', () => delItem(Number(btn.dataset.del))));
+      $tbody.querySelectorAll('[data-edit]').forEach(btn=> btn.addEventListener('click', () => editItem(Number(btn.dataset.edit))));
+    }
+
+    // ======== CRUD ========
+    function addItem(){
+      const d = $date.value;
+      const valor = parseValor($valor.value);
+      if (!valor || valor <= 0){ alert('Informe um valor válido.'); $valor.focus(); return; }
+      const item = {
+        id: crypto.randomUUID(),
+        data: d,
+        hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        cat: $cat.value,
+        desc: $desc.value.trim(),
+        valor: Number(valor.toFixed(2)),
+      };
+      const arr = loadDay(d);
+      arr.push(item); saveDay(d, arr); render();
+      // limpar inputs
+      $valor.value = ''; $desc.value = '';
+      $valor.focus();
+    }
+
+    function delItem(idx){
+      const d = $date.value;
+      const arr = loadDay(d);
+      if (!arr[idx]) return;
+      if (!confirm('Excluir este lançamento?')) return;
+      arr.splice(idx,1); saveDay(d, arr); render();
+    }
+
+    function editItem(idx){
+      const d = $date.value;
+      const arr = loadDay(d);
+      const it = arr[idx]; if (!it) return;
+      const novoValor = prompt(`Editar valor para ${catLabels[it.cat]} (use vírgula ou ponto)`, it.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
+      if (novoValor === null) return;
+      const v = parseValor(novoValor);
+      if (!v || v <= 0){ alert('Valor inválido.'); return; }
+      const novaDesc = prompt('Editar descrição (opcional):', it.desc || '');
+      it.valor = Number(v.toFixed(2));
+      it.desc = (novaDesc ?? it.desc || '').trim();
+      saveDay(d, arr); render();
+    }
+
+    // ======== Export/Print ========
+    function exportCSV(){
+      const d = $date.value;
+      const items = loadDay(d);
+      const rows = [
+        ['Data','Hora','Categoria','Descrição','Valor'],
+        ...items.map(it => [it.data, it.hora, catLabels[it.cat], (it.desc||'').replace(/\n/g,' '), it.valor.toFixed(2).replace('.',',')])
+      ];
+      const csv = '\ufeff' + rows.map(r => r.map(field => `"${String(field).replace(/"/g,'""')}"`).join(';')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `fechamento_${d}.csv`; a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    // ======== Init/Bindings ========
+    document.getElementById('addBtn').addEventListener('click', addItem);
+    document.getElementById('exportBtn').addEventListener('click', exportCSV);
+    document.getElementById('printBtn').addEventListener('click', () => window.print());
+    document.getElementById('todayBtn').addEventListener('click', () => { $date.value = nowLocalISODate(); render(); });
+    document.getElementById('clearDayBtn').addEventListener('click', () => {
+      if (confirm('Tem certeza que deseja limpar TODOS os lançamentos desta data?')){
+        saveDay($date.value, []); render();
+      }
+    });
+    document.getElementById('clearDescBtn').addEventListener('click', () => { $valor.value=''; $desc.value=''; $valor.focus(); });
+
+    $valor.addEventListener('blur', () => formatValorInput($valor));
+
+    $date.addEventListener('change', render);
+
+    // Define data inicial (hoje) e carrega
+    $date.value = nowLocalISODate();
+    render();
+  </script>
+</body>
+</html>
