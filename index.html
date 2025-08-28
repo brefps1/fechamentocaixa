@@ -3,45 +3,53 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Planilha de Fechamento de Caixa</title>
+  <title>Fechamento de Caixa — Modo Centavos</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; color: #333; }
-    h1 { text-align: center; }
-    .container { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,.1); }
+    h1 { text-align: center; margin-bottom: 10px; }
+    .container { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,.08); }
     label { display: block; margin-top: 10px; font-weight: bold; }
-    input, select, button { padding: 8px; margin-top: 5px; width: 100%; box-sizing: border-box; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    input, select, button { padding: 8px; margin-top: 5px; width: 100%; box-sizing: border-box; font-size: 16px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 18px; }
     th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
     th { background: #f0f0f0; }
     .right { text-align: right; }
+    .row { display:grid; grid-template-columns: 1fr 180px; gap:12px; align-items:end; }
+    @media(max-width:700px){ .row{ grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Planilha de Fechamento de Caixa</h1>
-    
-    <label for="cat">Categoria</label>
-    <select id="cat">
-      <option value="cartao">Cartão</option>
-      <option value="cartao_parcelado">Cartão (Parcelado)</option>
-      <option value="pix_chave">PIX (Chave)</option>
-      <option value="pix_maquina">PIX (Máquina)</option>
-      <option value="convenio">Convênio</option>
-      <option value="prazo">Prazo</option>
-      <option value="sangria_saida">Sangria/Saída</option>
-    </select>
 
-    <label for="valor">Valor (R$)</label>
-    <input type="number" id="valor" step="0.01" value="0.00" />
+    <div class="row">
+      <div>
+        <label for="cat">Categoria</label>
+        <select id="cat">
+          <option value="cartao">Cartão</option>
+          <option value="cartao_parcelado">Cartão (Parcelado)</option>
+          <option value="pix_chave">PIX (Chave)</option>
+          <option value="pix_maquina">PIX (Máquina)</option>
+          <option value="convenio">Convênio</option>
+          <option value="prazo">Prazo</option>
+          <option value="sangria_saida">Sangria/Saída</option>
+        </select>
+      </div>
 
-    <button id="addBtn">Adicionar</button>
+      <div>
+        <label for="valor">Valor (modo centavos)</label>
+        <!-- inputmode numeric melhora teclado em mobile -->
+        <input type="text" id="valor" inputmode="numeric" placeholder="0,00" autocomplete="off" />
+      </div>
+    </div>
+
+    <div style="margin-top:8px">
+      <button id="addBtn">Adicionar</button>
+    </div>
 
     <table>
       <thead>
-        <tr>
-          <th>Categoria</th>
-          <th class="right">Valor</th>
-        </tr>
+        <tr><th>Categoria</th><th class="right">Valor</th></tr>
       </thead>
       <tbody id="tbody"></tbody>
       <tfoot>
@@ -59,59 +67,115 @@
     </table>
   </div>
 
-  <script>
-    const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-    const $cat = document.getElementById('cat');
-    const $valor = document.getElementById('valor');
-    const $tbody = document.getElementById('tbody');
+<script>
+  // formatação BRL
+  const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
-    const totals = {
-      cartao: 0,
-      cartao_parcelado: 0,
-      pix_chave: 0,
-      pix_maquina: 0,
-      convenio: 0,
-      prazo: 0,
-      sangria_saida: 0,
-    };
+  const $valor = document.getElementById('valor');
+  const $cat = document.getElementById('cat');
+  const $tbody = document.getElementById('tbody');
 
-    let dados = [];
+  const totals = {
+    cartao: 0,
+    cartao_parcelado: 0,
+    pix_chave: 0,
+    pix_maquina: 0,
+    convenio: 0,
+    prazo: 0,
+    sangria_saida: 0
+  };
 
-    function render(){
-      $tbody.innerHTML = '';
-      dados.forEach(d => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${d.cat}</td><td class="right">${fmt.format(d.valor)}</td>`;
-        $tbody.appendChild(tr);
-      });
+  let dados = [];
 
-      document.getElementById('t_cartao').textContent = fmt.format(totals.cartao);
-      document.getElementById('t_cartao_parcelado').textContent = fmt.format(totals.cartao_parcelado);
-      document.getElementById('t_pix_chave').textContent = fmt.format(totals.pix_chave);
-      document.getElementById('t_pix_maquina').textContent = fmt.format(totals.pix_maquina);
-      document.getElementById('t_convenio').textContent = fmt.format(totals.convenio);
-      document.getElementById('t_prazo').textContent = fmt.format(totals.prazo);
-      document.getElementById('t_sangria_saida').textContent = fmt.format(totals.sangria_saida);
+  // formata número de centavos para string '0,10'
+  function formatCentsToBRL(cents){
+    const value = cents / 100;
+    return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
 
-      const entradas = totals.cartao + totals.cartao_parcelado + totals.pix_chave + totals.pix_maquina + totals.convenio + totals.prazo;
-      const saidas = totals.sangria_saida;
-      document.getElementById('t_entradas').textContent = fmt.format(entradas);
-      document.getElementById('t_saidas').textContent = fmt.format(saidas);
-      document.getElementById('t_saldo').textContent = fmt.format(entradas - saidas);
+  // extrai apenas dígitos (para tratamento tipo PDV)
+  function onlyDigits(s){
+    return String(s || '').replace(/\D/g, '');
+  }
+
+  // evento quando usuário digita/apaga: interpretamos tudo como centavos
+  $valor.addEventListener('input', (e) => {
+    const el = e.target;
+    // pega somente dígitos do texto (funciona para colar '12,34' ou '1.234,56')
+    let digits = onlyDigits(el.value);
+    if (!digits) {
+      el.dataset.cents = '0';
+      el.value = '';
+      return;
+    }
+    // remove zeros à esquerda (mas se for só zeros mantém 0)
+    digits = digits.replace(/^0+(?=\d)/, '');
+    const cents = parseInt(digits, 10);
+    el.dataset.cents = String(cents);
+    el.value = formatCentsToBRL(cents);
+  });
+
+  // melhorar comportamento ao colar: retirar caracteres indesejados e formatar
+  $valor.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    const digits = onlyDigits(text);
+    if (digits) {
+      $valor.dataset.cents = String(parseInt(digits,10));
+      $valor.value = formatCentsToBRL(parseInt(digits,10));
+    }
+  });
+
+  function render(){
+    $tbody.innerHTML = '';
+    dados.forEach(d => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${d.cat}</td><td class="right">${fmt.format(d.valor)}</td>`;
+      $tbody.appendChild(tr);
+    });
+
+    // atualizar KPIs
+    document.getElementById('t_cartao').textContent = fmt.format(totals.cartao);
+    document.getElementById('t_cartao_parcelado').textContent = fmt.format(totals.cartao_parcelado);
+    document.getElementById('t_pix_chave').textContent = fmt.format(totals.pix_chave);
+    document.getElementById('t_pix_maquina').textContent = fmt.format(totals.pix_maquina);
+    document.getElementById('t_convenio').textContent = fmt.format(totals.convenio);
+    document.getElementById('t_prazo').textContent = fmt.format(totals.prazo);
+    document.getElementById('t_sangria_saida').textContent = fmt.format(totals.sangria_saida);
+
+    const entradas = totals.cartao + totals.cartao_parcelado + totals.pix_chave + totals.pix_maquina + totals.convenio + totals.prazo;
+    const saidas = totals.sangria_saida;
+    document.getElementById('t_entradas').textContent = fmt.format(entradas);
+    document.getElementById('t_saidas').textContent = fmt.format(saidas);
+    document.getElementById('t_saldo').textContent = fmt.format(entradas - saidas);
+  }
+
+  // botão adicionar: pega cents do dataset e converte para número em reais
+  document.getElementById('addBtn').addEventListener('click', () => {
+    const cents = parseInt($valor.dataset.cents || '0', 10);
+    const valor = cents / 100;
+    if (isNaN(valor) || valor <= 0) {
+      alert('Digite um valor válido (maior que 0).');
+      $valor.focus();
+      return;
     }
 
-    document.getElementById('addBtn').addEventListener('click', () => {
-      let valor = parseFloat($valor.value);
-      if(isNaN(valor) || valor <= 0){
-        alert('Digite um valor válido.');
-        return;
-      }
-      const categoria = $cat.value;
-      dados.push({ cat: $cat.options[$cat.selectedIndex].text, valor });
-      totals[categoria] += valor;
-      render();
-      $valor.value = '0.00';
-    });
-  </script>
+    const categoria = $cat.value;
+    // adiciona ao array e ao total por categoria
+    dados.push({ cat: $cat.options[$cat.selectedIndex].text, valor });
+    totals[categoria] = +(totals[categoria] + valor).toFixed(2);
+
+    // limpar campo e renderizar
+    $valor.dataset.cents = '0';
+    $valor.value = '';
+    render();
+    $valor.focus();
+  });
+
+  // inicial
+  $valor.dataset.cents = '0';
+  render();
+
+</script>
 </body>
 </html>
