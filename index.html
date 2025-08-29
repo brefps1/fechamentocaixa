@@ -154,7 +154,7 @@
         currentUser = user;
         document.getElementById("loginBox").style.display = "none";
         document.getElementById("appBox").style.display = "block";
-        carregar(); // carrega dados do usuário atual
+        carregar();
       } else {
         currentUser = null;
         document.getElementById("loginBox").style.display = "block";
@@ -176,22 +176,23 @@
     let dados = [];
     let totals = {};
 
-    function getKey(){ 
+    // 🔑 Agora cada usuário tem sua coleção
+    function getDocRef() {
       if (!currentUser) return null;
-      return currentUser.uid + "_caixa_" + $dataRef.value; 
+      return doc(db, "users", currentUser.uid, "caixa", $dataRef.value);
     }
 
     async function salvar(){
       if (!currentUser) return;
       try {
-        await setDoc(doc(db, "caixa", getKey()), { dados, totals });
+        await setDoc(getDocRef(), { dados, totals });
       } catch(e){ console.error("Erro ao salvar:", e); }
     }
 
     async function carregar(){
       if (!currentUser) return;
       try {
-        const snap = await getDoc(doc(db, "caixa", getKey()));
+        const snap = await getDoc(getDocRef());
         if(snap.exists()){
           const obj = snap.data();
           dados = obj.dados || [];
@@ -207,7 +208,7 @@
     async function apagar(){
       if (!currentUser) return;
       try {
-        await deleteDoc(doc(db, "caixa", getKey()));
+        await deleteDoc(getDocRef());
         carregar();
       } catch(e){ console.error("Erro ao apagar:", e); }
     }
@@ -262,6 +263,17 @@
       el.dataset.cents = String(cents);
       el.value = (cents/100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
     });
+
+    // 📅 Setas de data funcionando
+    function mudarData(dias) {
+      const atual = new Date($dataRef.value);
+      atual.setDate(atual.getDate() + dias);
+      $dataRef.value = atual.toISOString().split('T')[0];
+      carregar();
+    }
+    $prevDay.addEventListener('click', () => mudarData(-1));
+    $nextDay.addEventListener('click', () => mudarData(1));
+    $dataRef.addEventListener('change', carregar);
 
     $valor.dataset.cents = '0';
     const hoje = new Date().toISOString().split('T')[0];
