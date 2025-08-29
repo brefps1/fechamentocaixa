@@ -55,7 +55,7 @@
           <tr><td>Prazo</td><td class="right" id="t_prazo">R$ 0,00</td></tr>
         </tbody>
         <tfoot>
-          <tr><th>Saldo Final</th><th class="right" id="t_saldo">R$ 0,00</th></tr>
+          <tr><th>Saldo Final</th><th class="right" id="t_saldo">R$ 0,00</td></tr>
         </tfoot>
       </table>
       <button id="clearBtn" style="margin-top:10px; width:100%;">🗑 Limpar Dados do Dia</button>
@@ -98,13 +98,11 @@
 
   <!-- Firebase -->
   <script type="module">
-    // Importa o Firebase via CDN
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    // Se precisar de outros serviços, descomente:
-    // import { getFirestore } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-    // import { getAuth } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc, deleteDoc } 
+      from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-    // Configuração do Firebase
+    // Configuração Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyB9ZSQq4pmLgVcC5KMiinTh9y6GKBkaw34",
       authDomain: "caixafechamento-a0c9b.firebaseapp.com",
@@ -114,13 +112,10 @@
       appId: "1:973436778587:web:151a3bb889460ffd65677e"
     };
 
-    // Inicializa Firebase
     const app = initializeApp(firebaseConfig);
-    console.log("Firebase inicializado:", app);
-  </script>
+    const db = getFirestore(app);
 
-  <!-- Seu script principal -->
-  <script>
+    // --- Lógica principal ---
     const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
     const $valor = document.getElementById('valor');
@@ -138,17 +133,40 @@
       return 'caixa_' + $dataRef.value;
     }
 
-    function salvar(){
-      localStorage.setItem(getKey(), JSON.stringify({dados, totals}));
+    async function salvar(){
+      try {
+        await setDoc(doc(db, "caixa", getKey()), { dados, totals });
+        console.log("✅ Dados salvos no Firestore!");
+      } catch(e){
+        console.error("Erro ao salvar:", e);
+      }
     }
 
-    function carregar(){
-      const obj = JSON.parse(localStorage.getItem(getKey()) || '{}');
-      dados = obj.dados || [];
-      totals = obj.totals || {
-        cartao:0, cartao_parcelado:0, pix_chave:0, pix_maquina:0, convenio:0, prazo:0
-      };
-      render();
+    async function carregar(){
+      try {
+        const snap = await getDoc(doc(db, "caixa", getKey()));
+        if(snap.exists()){
+          const obj = snap.data();
+          dados = obj.dados || [];
+          totals = obj.totals || {cartao:0, cartao_parcelado:0, pix_chave:0, pix_maquina:0, convenio:0, prazo:0};
+        } else {
+          dados = [];
+          totals = {cartao:0, cartao_parcelado:0, pix_chave:0, pix_maquina:0, convenio:0, prazo:0};
+        }
+        render();
+      } catch(e){
+        console.error("Erro ao carregar:", e);
+      }
+    }
+
+    async function apagar(){
+      try {
+        await deleteDoc(doc(db, "caixa", getKey()));
+        console.log("🗑 Dados apagados do Firestore!");
+        carregar();
+      } catch(e){
+        console.error("Erro ao apagar:", e);
+      }
     }
 
     function formatCentsToBRL(cents){
@@ -229,8 +247,7 @@
 
     document.getElementById('clearBtn').addEventListener('click', () => {
       if(confirm('Tem certeza que deseja apagar todos os dados deste dia?')){
-        localStorage.removeItem(getKey());
-        carregar();
+        apagar();
       }
     });
 
