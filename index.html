@@ -96,141 +96,165 @@
     </div>
   </div>
 
-<script>
-  const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+  <!-- Firebase -->
+  <script type="module">
+    // Importa o Firebase via CDN
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    // Se precisar de outros serviços, descomente:
+    // import { getFirestore } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+    // import { getAuth } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
-  const $valor = document.getElementById('valor');
-  const $cat = document.getElementById('cat');
-  const $tbody = document.getElementById('tbody');
-  const $detalhesTable = document.getElementById('detalhesTable');
-  const $dataRef = document.getElementById('dataRef');
-  const $prevDay = document.getElementById('prevDay');
-  const $nextDay = document.getElementById('nextDay');
-
-  let dados = [];
-  let totals = {};
-
-  function getKey(){
-    return 'caixa_' + $dataRef.value;
-  }
-
-  function salvar(){
-    localStorage.setItem(getKey(), JSON.stringify({dados, totals}));
-  }
-
-  function carregar(){
-    const obj = JSON.parse(localStorage.getItem(getKey()) || '{}');
-    dados = obj.dados || [];
-    totals = obj.totals || {
-      cartao:0, cartao_parcelado:0, pix_chave:0, pix_maquina:0, convenio:0, prazo:0
+    // Configuração do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyB9ZSQq4pmLgVcC5KMiinTh9y6GKBkaw34",
+      authDomain: "caixafechamento-a0c9b.firebaseapp.com",
+      projectId: "caixafechamento-a0c9b",
+      storageBucket: "caixafechamento-a0c9b.firebasestorage.app",
+      messagingSenderId: "973436778587",
+      appId: "1:973436778587:web:151a3bb889460ffd65677e"
     };
-    render();
-  }
 
-  function formatCentsToBRL(cents){
-    const value = cents / 100;
-    return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
+    // Inicializa Firebase
+    const app = initializeApp(firebaseConfig);
+    console.log("Firebase inicializado:", app);
+  </script>
 
-  function onlyDigits(s){
-    return String(s || '').replace(/\D/g, '');
-  }
+  <!-- Seu script principal -->
+  <script>
+    const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  $valor.addEventListener('input', (e) => {
-    const el = e.target;
-    let digits = onlyDigits(el.value);
-    if (!digits) {
-      el.dataset.cents = '0';
-      el.value = '';
-      return;
+    const $valor = document.getElementById('valor');
+    const $cat = document.getElementById('cat');
+    const $tbody = document.getElementById('tbody');
+    const $detalhesTable = document.getElementById('detalhesTable');
+    const $dataRef = document.getElementById('dataRef');
+    const $prevDay = document.getElementById('prevDay');
+    const $nextDay = document.getElementById('nextDay');
+
+    let dados = [];
+    let totals = {};
+
+    function getKey(){
+      return 'caixa_' + $dataRef.value;
     }
-    digits = digits.replace(/^0+(?=\d)/, '');
-    const cents = parseInt(digits, 10);
-    el.dataset.cents = String(cents);
-    el.value = formatCentsToBRL(cents);
-  });
 
-  $valor.addEventListener('paste', (e) => {
-    e.preventDefault();
-    const text = (e.clipboardData || window.clipboardData).getData('text');
-    const digits = onlyDigits(text);
-    if (digits) {
-      $valor.dataset.cents = String(parseInt(digits,10));
-      $valor.value = formatCentsToBRL(parseInt(digits,10));
+    function salvar(){
+      localStorage.setItem(getKey(), JSON.stringify({dados, totals}));
     }
-  });
 
-  function render(){
-    $tbody.innerHTML = '';
-    dados.forEach(d => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${d.cat}</td><td class="right">${fmt.format(d.valor)}</td>`;
-      $tbody.appendChild(tr);
+    function carregar(){
+      const obj = JSON.parse(localStorage.getItem(getKey()) || '{}');
+      dados = obj.dados || [];
+      totals = obj.totals || {
+        cartao:0, cartao_parcelado:0, pix_chave:0, pix_maquina:0, convenio:0, prazo:0
+      };
+      render();
+    }
+
+    function formatCentsToBRL(cents){
+      const value = cents / 100;
+      return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function onlyDigits(s){
+      return String(s || '').replace(/\D/g, '');
+    }
+
+    $valor.addEventListener('input', (e) => {
+      const el = e.target;
+      let digits = onlyDigits(el.value);
+      if (!digits) {
+        el.dataset.cents = '0';
+        el.value = '';
+        return;
+      }
+      digits = digits.replace(/^0+(?=\d)/, '');
+      const cents = parseInt(digits, 10);
+      el.dataset.cents = String(cents);
+      el.value = formatCentsToBRL(cents);
     });
 
-    document.getElementById('t_cartao').textContent = fmt.format(totals.cartao);
-    document.getElementById('t_cartao_parcelado').textContent = fmt.format(totals.cartao_parcelado);
-    document.getElementById('t_pix_chave').textContent = fmt.format(totals.pix_chave);
-    document.getElementById('t_pix_maquina').textContent = fmt.format(totals.pix_maquina);
-    document.getElementById('t_convenio').textContent = fmt.format(totals.convenio);
-    document.getElementById('t_prazo').textContent = fmt.format(totals.prazo);
+    $valor.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      const digits = onlyDigits(text);
+      if (digits) {
+        $valor.dataset.cents = String(parseInt(digits,10));
+        $valor.value = formatCentsToBRL(parseInt(digits,10));
+      }
+    });
 
-    const entradas = totals.cartao + totals.cartao_parcelado + totals.pix_chave + totals.pix_maquina + totals.convenio + totals.prazo;
-    document.getElementById('t_saldo').textContent = fmt.format(entradas);
-  }
+    function render(){
+      $tbody.innerHTML = '';
+      dados.forEach(d => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${d.cat}</td><td class="right">${fmt.format(d.valor)}</td>`;
+        $tbody.appendChild(tr);
+      });
 
-  document.getElementById('addBtn').addEventListener('click', () => {
-    const cents = parseInt($valor.dataset.cents || '0', 10);
-    const valor = cents / 100;
-    if (isNaN(valor) || valor <= 0) {
-      alert('Digite um valor válido (maior que 0).');
-      $valor.focus();
-      return;
+      document.getElementById('t_cartao').textContent = fmt.format(totals.cartao);
+      document.getElementById('t_cartao_parcelado').textContent = fmt.format(totals.cartao_parcelado);
+      document.getElementById('t_pix_chave').textContent = fmt.format(totals.pix_chave);
+      document.getElementById('t_pix_maquina').textContent = fmt.format(totals.pix_maquina);
+      document.getElementById('t_convenio').textContent = fmt.format(totals.convenio);
+      document.getElementById('t_prazo').textContent = fmt.format(totals.prazo);
+
+      const entradas = totals.cartao + totals.cartao_parcelado + totals.pix_chave + totals.pix_maquina + totals.convenio + totals.prazo;
+      document.getElementById('t_saldo').textContent = fmt.format(entradas);
     }
 
-    const categoria = $cat.value;
-    dados.push({ cat: $cat.options[$cat.selectedIndex].text, valor });
-    totals[categoria] = +(totals[categoria] + valor).toFixed(2);
+    document.getElementById('addBtn').addEventListener('click', () => {
+      const cents = parseInt($valor.dataset.cents || '0', 10);
+      const valor = cents / 100;
+      if (isNaN(valor) || valor <= 0) {
+        alert('Digite um valor válido (maior que 0).');
+        $valor.focus();
+        return;
+      }
+
+      const categoria = $cat.value;
+      dados.push({ cat: $cat.options[$cat.selectedIndex].text, valor });
+      totals[categoria] = +(totals[categoria] + valor).toFixed(2);
+
+      $valor.dataset.cents = '0';
+      $valor.value = '';
+      render();
+      salvar();
+      $valor.focus();
+    });
+
+    document.getElementById('detalhesBtn').addEventListener('click', () => {
+      $detalhesTable.style.display = $detalhesTable.style.display === 'none' ? 'table' : 'none';
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      if(confirm('Tem certeza que deseja apagar todos os dados deste dia?')){
+        localStorage.removeItem(getKey());
+        carregar();
+      }
+    });
+
+    $dataRef.addEventListener('change', carregar);
+
+    $prevDay.addEventListener('click', () => {
+      const date = new Date($dataRef.value);
+      date.setDate(date.getDate() - 1);
+      $dataRef.value = date.toISOString().split('T')[0];
+      carregar();
+    });
+
+    $nextDay.addEventListener('click', () => {
+      const date = new Date($dataRef.value);
+      date.setDate(date.getDate() + 1);
+      $dataRef.value = date.toISOString().split('T')[0];
+      carregar();
+    });
 
     $valor.dataset.cents = '0';
-    $valor.value = '';
-    render();
-    salvar();
-    $valor.focus();
-  });
 
-  document.getElementById('detalhesBtn').addEventListener('click', () => {
-    $detalhesTable.style.display = $detalhesTable.style.display === 'none' ? 'table' : 'none';
-  });
-
-  document.getElementById('clearBtn').addEventListener('click', () => {
-    if(confirm('Tem certeza que deseja apagar todos os dados deste dia?')){
-      localStorage.removeItem(getKey());
-      carregar();
-    }
-  });
-
-  $dataRef.addEventListener('change', carregar);
-
-  $prevDay.addEventListener('click', () => {
-    const date = new Date($dataRef.value);
-    date.setDate(date.getDate() - 1);
-    $dataRef.value = date.toISOString().split('T')[0];
+    const hoje = new Date().toISOString().split('T')[0];
+    $dataRef.value = hoje;
     carregar();
-  });
-
-  $nextDay.addEventListener('click', () => {
-    const date = new Date($dataRef.value);
-    date.setDate(date.getDate() + 1);
-    $dataRef.value = date.toISOString().split('T')[0];
-    carregar();
-  });
-
-  $valor.dataset.cents = '0';
-
-  const hoje = new Date().toISOString().split('T')[0];
-  $dataRef.value = hoje;
-  carregar();
-</script>
+  </script>
 </body>
 </html>
