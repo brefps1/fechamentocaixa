@@ -134,6 +134,8 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
+    let currentUser = null;
+
     // --- LOGIN ---
     document.getElementById("loginBtn").addEventListener("click", async () => {
       const email = document.getElementById("email").value;
@@ -149,9 +151,12 @@
 
     onAuthStateChanged(auth, (user) => {
       if (user) {
+        currentUser = user;
         document.getElementById("loginBox").style.display = "none";
         document.getElementById("appBox").style.display = "block";
+        carregar(); // carrega dados do usuário atual
       } else {
+        currentUser = null;
         document.getElementById("loginBox").style.display = "block";
         document.getElementById("appBox").style.display = "none";
       }
@@ -171,15 +176,20 @@
     let dados = [];
     let totals = {};
 
-    function getKey(){ return 'caixa_' + $dataRef.value; }
+    function getKey(){ 
+      if (!currentUser) return null;
+      return currentUser.uid + "_caixa_" + $dataRef.value; 
+    }
 
     async function salvar(){
+      if (!currentUser) return;
       try {
         await setDoc(doc(db, "caixa", getKey()), { dados, totals });
       } catch(e){ console.error("Erro ao salvar:", e); }
     }
 
     async function carregar(){
+      if (!currentUser) return;
       try {
         const snap = await getDoc(doc(db, "caixa", getKey()));
         if(snap.exists()){
@@ -195,6 +205,7 @@
     }
 
     async function apagar(){
+      if (!currentUser) return;
       try {
         await deleteDoc(doc(db, "caixa", getKey()));
         carregar();
@@ -254,10 +265,7 @@
 
     $valor.dataset.cents = '0';
     const hoje = new Date().toISOString().split('T')[0];
-    $dataRef.value = hoje; carregar();
-    $dataRef.addEventListener('change', carregar);
-    $prevDay.addEventListener('click', () => { const d=new Date($dataRef.value); d.setDate(d.getDate()-1); $dataRef.value=d.toISOString().split('T')[0]; carregar(); });
-    $nextDay.addEventListener('click', () => { const d=new Date($dataRef.value); d.setDate(d.getDate()+1); $dataRef.value=d.toISOString().split('T')[0]; carregar(); });
+    $dataRef.value = hoje;
   </script>
 </body>
 </html>
