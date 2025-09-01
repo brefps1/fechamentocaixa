@@ -29,12 +29,6 @@
     #clearBtn { background:#e60000; color:white; border:none; border-radius:8px; padding:10px; }
     #clearBtn:hover { background:#ff1a1a; }
     #loginBox { max-width: 400px; margin: auto; background:white; padding:20px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,.12); }
-
-    /* Modal */
-    #editModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; }
-    #editContent { background:white; padding:20px; border-radius:12px; width:300px; box-shadow:0 4px 12px rgba(0,0,0,.3); }
-    #editContent h3 { margin-top:0; color:#b30000; }
-    #editContent button { margin-top:10px; width:100%; }
   </style>
 </head>
 <body>
@@ -112,31 +106,11 @@
 
         <table id="detalhesTable" style="display:none; margin-top:15px;">
           <thead>
-            <tr><th>Categoria</th><th class="right">Valor</th><th>Ações</th></tr>
+            <tr><th>Categoria</th><th class="right">Valor</th></tr>
           </thead>
           <tbody id="tbody"></tbody>
         </table>
       </div>
-    </div>
-  </div>
-
-  <!-- Modal de edição -->
-  <div id="editModal">
-    <div id="editContent">
-      <h3>✏️ Editar Lançamento</h3>
-      <label for="editCat">Categoria</label>
-      <select id="editCat">
-        <option value="cartao">Cartão</option>
-        <option value="cartao_parcelado">Cartão (Parcelado)</option>
-        <option value="pix_chave">PIX (Chave)</option>
-        <option value="pix_maquina">PIX (Máquina)</option>
-        <option value="convenio">Convênio</option>
-        <option value="prazo">Prazo</option>
-      </select>
-      <label for="editValor">Valor</label>
-      <input type="number" id="editValor" min="0.01" step="0.01" />
-      <button id="saveEditBtn">💾 Salvar</button>
-      <button id="cancelEditBtn">❌ Cancelar</button>
     </div>
   </div>
 
@@ -146,64 +120,164 @@
     import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
-    const firebaseConfig = { /* mesmo config */ };
+    // Configuração Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyB9ZSQq4pmLgVcC5KMiinTh9y6GKBkaw34",
+      authDomain: "caixafechamento-a0c9b.firebaseapp.com",
+      projectId: "caixafechamento-a0c9b",
+      storageBucket: "caixafechamento-a0c9b.firebasestorage.app",
+      messagingSenderId: "973436778587",
+      appId: "1:973436778587:web:151a3bb889460ffd65677e"
+    };
+
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
 
     let currentUser = null;
-    let editId = null;
 
-    // ... (login e funções iguais até render)
+    // --- LOGIN ---
+    document.getElementById("loginBtn").addEventListener("click", async () => {
+      const email = document.getElementById("email").value;
+      const senha = document.getElementById("senha").value;
+      try {
+        await signInWithEmailAndPassword(auth, email, senha);
+        document.getElementById("msg").textContent = "";
+      } catch (e) {
+        document.getElementById("msg").textContent = "❌ Usuário ou senha inválidos";
+        console.error(e);
+      }
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        currentUser = user;
+        document.getElementById("loginBox").style.display = "none";
+        document.getElementById("appBox").style.display = "block";
+        carregar();
+      } else {
+        currentUser = null;
+        document.getElementById("loginBox").style.display = "block";
+        document.getElementById("appBox").style.display = "none";
+      }
+    });
+
+    window.sair = () => signOut(auth);
+
+    // --- SISTEMA DE CAIXA ---
+    const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+    const $valor = document.getElementById('valor');
+    const $cat = document.getElementById('cat');
+    const $tbody = document.getElementById('tbody');
+    const $detalhesTable = document.getElementById('detalhesTable');
+    const $dataRef = document.getElementById('dataRef');
+    const $prevDay = document.getElementById('prevDay');
+    const $nextDay = document.getElementById('nextDay');
+    let dados = [];
+    let totals = {};
+
+    // 🔑 Agora cada usuário tem sua coleção
+    function getDocRef() {
+      if (!currentUser) return null;
+      return doc(db, "users", currentUser.uid, "caixa", $dataRef.value);
+    }
+
+    async function salvar(){
+      if (!currentUser) return;
+      try {
+        await setDoc(getDocRef(), { dados, totals });
+      } catch(e){ console.error("Erro ao salvar:", e); }
+    }
+
+    async function carregar(){
+      if (!currentUser) return;
+      try {
+        const snap = await getDoc(getDocRef());
+        if(snap.exists()){
+          const obj = snap.data();
+          dados = obj.dados || [];
+          totals = obj.totals || {cartao:0, cartao_parcelado:0, pix_chave:0, pix_maquina:0, convenio:0, prazo:0};
+        } else {
+          dados = [];
+          totals = {cartao:0, cartao_parcelado:0, pix_chave:0, pix_maquina:0, convenio:0, prazo:0};
+        }
+        render();
+      } catch(e){ console.error("Erro ao carregar:", e); }
+    }
+
+    async function apagar(){
+      if (!currentUser) return;
+      try {
+        await deleteDoc(getDocRef());
+        carregar();
+      } catch(e){ console.error("Erro ao apagar:", e); }
+    }
 
     function render(){
       $tbody.innerHTML = '';
       dados.forEach(d => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${d.cat}</td>
-          <td class="right">${fmt.format(d.valor)}</td>
-          <td>
-            <button onclick="editarLancamento('${d.id}')">✏️</button>
-            <button onclick="excluirLancamento('${d.id}')">🗑</button>
-          </td>`;
+        tr.innerHTML = <td>${d.cat}</td><td class="right">${fmt.format(d.valor)}</td>;
         $tbody.appendChild(tr);
       });
-      // ... recalculo dos totais igual
+
+      document.getElementById('t_cartao').textContent = fmt.format(totals.cartao);
+      document.getElementById('t_cartao_parcelado').textContent = fmt.format(totals.cartao_parcelado);
+      document.getElementById('t_pix_chave').textContent = fmt.format(totals.pix_chave);
+      document.getElementById('t_pix_maquina').textContent = fmt.format(totals.pix_maquina);
+      document.getElementById('t_convenio').textContent = fmt.format(totals.convenio);
+      document.getElementById('t_prazo').textContent = fmt.format(totals.prazo);
+
+      const entradas = totals.cartao + totals.cartao_parcelado + totals.pix_chave + totals.pix_maquina + totals.convenio + totals.prazo;
+      document.getElementById('t_saldo').textContent = fmt.format(entradas);
     }
 
-    window.excluirLancamento = (id) => {
-      if (!confirm("Excluir este lançamento?")) return;
-      dados = dados.filter(d => d.id !== id);
-      render();
-    };
-
-    window.editarLancamento = (id) => {
-      const item = dados.find(d => d.id === id);
-      if (!item) return;
-      editId = id;
-      document.getElementById('editCat').value = item.catKey;
-      document.getElementById('editValor').value = item.valor;
-      document.getElementById('editModal').style.display = 'flex';
-    };
-
-    document.getElementById('cancelEditBtn').addEventListener('click', () => {
-      document.getElementById('editModal').style.display = 'none';
-      editId = null;
+    document.getElementById('addBtn').addEventListener('click', () => {
+      const cents = parseInt($valor.dataset.cents || '0', 10);
+      const valor = cents / 100;
+      if (isNaN(valor) || valor <= 0) {
+        alert('Digite um valor válido (maior que 0).');
+        $valor.focus(); return;
+      }
+      const categoria = $cat.value;
+      dados.push({ cat: $cat.options[$cat.selectedIndex].text, valor });
+      totals[categoria] = +(totals[categoria] + valor).toFixed(2);
+      $valor.dataset.cents = '0'; $valor.value = '';
+      render(); salvar(); $valor.focus();
     });
 
-    document.getElementById('saveEditBtn').addEventListener('click', () => {
-      const novaCat = document.getElementById('editCat').value;
-      const novoValor = parseFloat(document.getElementById('editValor').value);
-      if (!totals.hasOwnProperty(novaCat) || isNaN(novoValor) || novoValor <= 0) return;
-      const item = dados.find(d => d.id === editId);
-      item.catKey = novaCat;
-      item.cat = document.querySelector(`#editCat option[value="${novaCat}"]`).textContent;
-      item.valor = novoValor;
-      editId = null;
-      document.getElementById('editModal').style.display = 'none';
-      render();
+    document.getElementById('detalhesBtn').addEventListener('click', () => {
+      $detalhesTable.style.display = $detalhesTable.style.display === 'none' ? 'table' : 'none';
     });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      if(confirm('Apagar todos os dados deste dia?')) apagar();
+    });
+
+    $valor.addEventListener('input', (e) => {
+      const el = e.target;
+      let digits = String(el.value).replace(/\D/g, '');
+      if (!digits) { el.dataset.cents = '0'; el.value = ''; return; }
+      digits = digits.replace(/^0+(?=\d)/, '');
+      const cents = parseInt(digits, 10);
+      el.dataset.cents = String(cents);
+      el.value = (cents/100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    });
+
+    // 📅 Setas de data funcionando
+    function mudarData(dias) {
+      const atual = new Date($dataRef.value);
+      atual.setDate(atual.getDate() + dias);
+      $dataRef.value = atual.toISOString().split('T')[0];
+      carregar();
+    }
+    $prevDay.addEventListener('click', () => mudarData(-1));
+    $nextDay.addEventListener('click', () => mudarData(1));
+    $dataRef.addEventListener('change', carregar);
+
+    $valor.dataset.cents = '0';
+    const hoje = new Date().toISOString().split('T')[0];
+    $dataRef.value = hoje;
   </script>
 </body>
 </html>
