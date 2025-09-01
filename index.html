@@ -161,85 +161,127 @@
     </div>
   </div>
 
-  <!-- Firebase -->
+  <!-- Firebase + JS -->
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
-    // Configuração Firebase
-    const firebaseConfig = {
-      apiKey: "AIzaSyB9ZSQq4pmLgVcC5KMiinTh9y6GKBkaw34",
-      authDomain: "caixafechamento-a0c9b.firebaseapp.com",
-      projectId: "caixafechamento-a0c9b",
-      storageBucket: "caixafechamento-a0c9b.appspot.com",
-      messagingSenderId: "973436778587",
-      appId: "1:973436778587:web:151a3bb889460ffd65677e"
-    };
+// Config Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyB9ZSQq4pmLgVcC5KMiinTh9y6GKBkaw34",
+  authDomain: "caixafechamento-a0c9b.firebaseapp.com",
+  projectId: "caixafechamento-a0c9b",
+  storageBucket: "caixafechamento-a0c9b.appspot.com",
+  messagingSenderId: "973436778587",
+  appId: "1:973436778587:web:151a3bb889460ffd65677e"
+};
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
-    let currentUser = null;
-    let dados = [];
-    let totals = {};
-    let editIndex = null;
+let currentUser=null,dados=[],totals={},editIndex=null;
+const fmt=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+const normalize=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const LABEL_TO_KEY={ 'cartao':'cartao','cartao (parcelado)':'cartao_parcelado','pix (chave)':'pix_chave','pix (maquina)':'pix_maquina','convenio':'convenio','prazo':'prazo'};
+const labelToKey=label=>LABEL_TO_KEY[normalize(label)]||null;
+const keyToLabel=key=>document.querySelector(`#cat option[value="${key}"]`)?.textContent||key;
+const round2=n=>Math.round((Number(n)+Number.EPSILON)*100)/100;
 
-    // Helpers
-    const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-    const normalize = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const LABEL_TO_KEY = {
-      'cartao': 'cartao',
-      'cartao (parcelado)': 'cartao_parcelado',
-      'pix (chave)': 'pix_chave',
-      'pix (maquina)': 'pix_maquina',
-      'convenio': 'convenio',
-      'prazo': 'prazo',
-    };
-    const labelToKey = (label) => LABEL_TO_KEY[normalize(label)] || null;
-    const keyToLabel = (key) => document.querySelector(`#cat option[value="${key}"]`)?.textContent || key;
-    const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const $valor=document.getElementById('valor');
+const $cat=document.getElementById('cat');
+const $tbody=document.getElementById('tbody');
+const $detalhesTable=document.getElementById('detalhesTable');
+const $dataRef=document.getElementById('dataRef');
+const $prevDay=document.getElementById('prevDay');
+const $nextDay=document.getElementById('nextDay');
+const $editModal=document.getElementById('editModal');
+const $editCat=document.getElementById('editCat');
+const $editValor=document.getElementById('editValor');
 
-    // NOVA FUNÇÃO: recalcular totais
-    function recalcularTotais() {
-      totals = {cartao:0, cartao_parcelado:0, pix_chave:0, pix_maquina:0, convenio:0, prazo:0};
-      dados.forEach(d => {
-        const key = labelToKey(d.cat);
-        if (key) {
-          totals[key] = round2((totals[key] || 0) + d.valor);
-        }
-      });
-    }
+// LOGIN
+document.getElementById("loginBtn").addEventListener("click",async()=>{
+  const email=document.getElementById("email").value;
+  const senha=document.getElementById("senha").value;
+  try{ await signInWithEmailAndPassword(auth,email,senha); document.getElementById("msg").textContent=""; }
+  catch(e){ document.getElementById("msg").textContent="❌ Usuário ou senha inválidos"; }
+});
 
-    // [resto do código é igual até EDITAR...]
+onAuthStateChanged(auth,user=>{
+  if(user){ currentUser=user; document.getElementById("loginBox").style.display="none"; document.getElementById("appBox").style.display="block"; carregar(); }
+  else{ currentUser=null; document.getElementById("loginBox").style.display="block"; document.getElementById("appBox").style.display="none"; }
+});
+window.sair=()=>signOut(auth);
 
-    // Salvar edição (corrigido p/ usar recalcularTotais)
-    document.getElementById('saveEdit').addEventListener('click', () => {
-      if (editIndex === null) return;
-      const item = dados[editIndex];
+// FIRESTORE
+function getDocRef(){ if(!currentUser) return null; return doc(db,"users",currentUser.uid,"caixa",$dataRef.value); }
+async function salvar(){ if(!currentUser) return; await setDoc(getDocRef(),{dados,totals}); }
+async function carregar(){
+  if(!currentUser) return;
+  const snap=await getDoc(getDocRef());
+  if(snap.exists()){ const obj=snap.data(); dados=obj.dados||[]; totals=obj.totals||{cartao:0,cartao_parcelado:0,pix_chave:0,pix_maquina:0,convenio:0,prazo:0}; }
+  else{ dados=[]; totals={cartao:0,cartao_parcelado:0,pix_chave:0,pix_maquina:0,convenio:0,prazo:0}; }
+  render();
+}
+async function apagar(){ if(!currentUser) return; await deleteDoc(getDocRef()); carregar(); }
+function recalcularTotais(){ totals={cartao:0,cartao_parcelado:0,pix_chave:0,pix_maquina:0,convenio:0,prazo:0}; dados.forEach(d=>{ const k=labelToKey(d.cat); if(k) totals[k]=round2((totals[k]||0)+d.valor); }); }
 
-      const novaCat = $editCat.value;
-      const novoValorNum = parseFloat(String($editValor.value).replace(/\./g,'').replace(',', '.'));
-      if (isNaN(novoValorNum) || novoValorNum <= 0) return;
+function render(){
+  $tbody.innerHTML='';
+  dados.forEach((d,i)=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${d.cat}</td><td class="right">${fmt.format(d.valor)}</td><td><button onclick="editar(${i})">✏️</button><button onclick="excluir(${i})">🗑</button></td>`; $tbody.appendChild(tr); });
+  document.getElementById('t_cartao').textContent=fmt.format(totals.cartao);
+  document.getElementById('t_cartao_parcelado').textContent=fmt.format(totals.cartao_parcelado);
+  document.getElementById('t_pix_chave').textContent=fmt.format(totals.pix_chave);
+  document.getElementById('t_pix_maquina').textContent=fmt.format(totals.pix_maquina);
+  document.getElementById('t_convenio').textContent=fmt.format(totals.convenio);
+  document.getElementById('t_prazo').textContent=fmt.format(totals.prazo);
+  const entradas=totals.cartao+totals.cartao_parcelado+totals.pix_chave+totals.pix_maquina+totals.convenio+totals.prazo;
+  document.getElementById('t_saldo').textContent=fmt.format(entradas);
+}
 
-      item.cat = keyToLabel(novaCat);
-      item.valor = round2(novoValorNum);
+// ADICIONAR
+document.getElementById('addBtn').addEventListener('click',()=>{
+  const cents=parseInt($valor.dataset.cents||'0',10);
+  const valor=cents/100;
+  if(isNaN(valor)||valor<=0){ alert('Digite um valor válido (maior que 0).'); $valor.focus(); return; }
+  const categoria=$cat.value; const label=$cat.options[$cat.selectedIndex].text;
+  dados.push({cat:label,valor:round2(valor)});
+  recalcularTotais(); $valor.dataset.cents='0'; $valor.value=''; render(); salvar(); $valor.focus();
+});
 
-      recalcularTotais();
+// EDITAR
+window.editar=(i)=>{ editIndex=i; const item=dados[i]; const oldKey=labelToKey(item.cat); if(oldKey)$editCat.value=oldKey; $editValor.value=String(item.valor).replace('.',','); $editModal.style.display='flex'; }
+document.getElementById('saveEdit').addEventListener('click',()=>{
+  if(editIndex===null) return;
+  const item=dados[editIndex];
+  const novaCat=$editCat.value;
+  const novoValorNum=parseFloat(String($editValor.value).replace(/\./g,'').replace(',','.'));
+  if(isNaN(novoValorNum)||novoValorNum<=0) return;
+  item.cat=keyToLabel(novaCat); item.valor=round2(novoValorNum);
+  recalcularTotais(); editIndex=null; $editModal.style.display='none'; salvar(); render();
+});
+document.getElementById('cancelEdit').addEventListener('click',()=>{ $editModal.style.display='none'; editIndex=null; });
 
-      editIndex = null;
-      $editModal.style.display = 'none';
-      salvar(); render();
-    });
+// EXCLUIR
+window.excluir=(i)=>{ if(!confirm("Excluir este lançamento?")) return; dados.splice(i,1); recalcularTotais(); salvar(); render(); }
 
-    // Excluir (corrigido p/ usar recalcularTotais)
-    window.excluir = (i) => {
-      if (!confirm("Excluir este lançamento?")) return;
-      dados.splice(i, 1);
-      recalcularTotais();
-      salvar(); render();
-    };
+// Detalhes/limpar
+document.getElementById('detalhesBtn').addEventListener('click',()=>{ $detalhesTable.style.display=$detalhesTable.style.display==='none'?'table':'none'; });
+document.getElementById('clearBtn').addEventListener('click',()=>{ if(confirm('Apagar todos os dados deste dia?')) apagar(); });
+
+// Campo valor
+$valor.addEventListener('input',(e)=>{ const el=e.target; let digits=String(el.value).replace(/\D/g,''); if(!digits){ el.dataset.cents='0'; el.value=''; return; } digits=digits.replace(/^0+(?=\d)/,''); const cents=parseInt(digits,10); el.dataset.cents=String(cents); el.value=(cents/100).toLocaleString('pt-BR',{minimumFractionDigits:2}); });
+
+// Navegação por data
+function mudarData(dias){ const atual=new Date($dataRef.value); atual.setDate(atual.getDate()+dias); $dataRef.value=atual.toISOString().split('T')[0]; carregar(); }
+$prevDay.addEventListener('click',()=>mudarData(-1));
+$nextDay.addEventListener('click',()=>mudarData(1));
+$dataRef.addEventListener('change',carregar);
+
+// Inicial
+$valor.dataset.cents='0';
+$dataRef.value=new Date().toISOString().split('T')[0];
   </script>
 </body>
 </html>
