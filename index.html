@@ -34,7 +34,7 @@
     #editModal {
       display: none;
       position: fixed;
-      top: 0; left: 0; right:0; bottom:0;
+      inset: 0;
       background: rgba(0,0,0,0.5);
       justify-content: center;
       align-items: center;
@@ -46,16 +46,8 @@
       width: 350px;
       box-shadow: 0 4px 12px rgba(0,0,0,.2);
     }
-    #editModal h3 {
-      margin-top: 0;
-      color: #b30000;
-    }
-    #editModal button {
-      margin-top: 10px;
-      padding: 10px;
-      border-radius: 8px;
-      width: 48%;
-    }
+    #editModal h3 { margin-top: 0; color: #b30000; }
+    #editModal button { margin-top: 10px; padding: 10px; border-radius: 8px; width: 48%; }
     #saveEdit { background: #28a745; color:white; }
     #cancelEdit { background: #dc3545; color:white; }
   </style>
@@ -161,7 +153,7 @@
         <option value="prazo">Prazo</option>
       </select>
       <label style="margin-top:10px;">Valor</label>
-      <input type="number" id="editValor" step="0.01" style="width:100%;" />
+      <input type="text" id="editValor" inputmode="decimal" style="width:100%;" placeholder="0,00" />
       <div style="display:flex; justify-content:space-between; margin-top:15px;">
         <button id="saveEdit">Salvar</button>
         <button id="cancelEdit">Cancelar</button>
@@ -175,6 +167,7 @@
     import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
+    // Configuração Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyB9ZSQq4pmLgVcC5KMiinTh9y6GKBkaw34",
       authDomain: "caixafechamento-a0c9b.firebaseapp.com",
@@ -193,7 +186,22 @@
     let totals = {};
     let editIndex = null;
 
+    // Helpers de formatação/categoria
     const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+    const normalize = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const LABEL_TO_KEY = {
+      'cartao': 'cartao',
+      'cartao (parcelado)': 'cartao_parcelado',
+      'pix (chave)': 'pix_chave',
+      'pix (maquina)': 'pix_maquina',
+      'convenio': 'convenio',
+      'prazo': 'prazo',
+    };
+    const labelToKey = (label) => LABEL_TO_KEY[normalize(label)] || null;
+    const keyToLabel = (key) => document.querySelector(`#cat option[value="${key}"]`)?.textContent || key;
+    const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+
+    // DOM
     const $valor = document.getElementById('valor');
     const $cat = document.getElementById('cat');
     const $tbody = document.getElementById('tbody');
@@ -201,12 +209,11 @@
     const $dataRef = document.getElementById('dataRef');
     const $prevDay = document.getElementById('prevDay');
     const $nextDay = document.getElementById('nextDay');
-
     const $editModal = document.getElementById('editModal');
     const $editCat = document.getElementById('editCat');
     const $editValor = document.getElementById('editValor');
 
-    // login
+    // LOGIN
     document.getElementById("loginBtn").addEventListener("click", async () => {
       const email = document.getElementById("email").value;
       const senha = document.getElementById("senha").value;
@@ -233,6 +240,7 @@
 
     window.sair = () => signOut(auth);
 
+    // FIRESTORE
     function getDocRef() {
       if (!currentUser) return null;
       return doc(db, "users", currentUser.uid, "caixa", $dataRef.value);
@@ -263,6 +271,7 @@
       carregar();
     }
 
+    // UI PRINCIPAL
     function render(){
       $tbody.innerHTML = '';
       dados.forEach((d, i) => {
@@ -289,7 +298,7 @@
       document.getElementById('t_saldo').textContent = fmt.format(entradas);
     }
 
-    // adicionar
+    // ADICIONAR
     document.getElementById('addBtn').addEventListener('click', () => {
       const cents = parseInt($valor.dataset.cents || '0', 10);
       const valor = cents / 100;
@@ -297,38 +306,49 @@
         alert('Digite um valor válido (maior que 0).');
         $valor.focus(); return;
       }
-      const categoria = $cat.value;
-      dados.push({ cat: $cat.options[$cat.selectedIndex].text, valor });
-      totals[categoria] = +(totals[categoria] + valor).toFixed(2);
+      const categoria = $cat.value; // chave
+      const label = $cat.options[$cat.selectedIndex].text; // rótulo exibido
+      dados.push({ cat: label, valor: round2(valor) });
+
+      totals[categoria] = round2((totals[categoria] || 0) + valor);
       $valor.dataset.cents = '0'; $valor.value = '';
       render(); salvar(); $valor.focus();
     });
 
-    // editar (abre modal)
+    // EDITAR (abre modal)
     window.editar = (i) => {
       editIndex = i;
       const item = dados[i];
-      const chave = Object.keys(totals).find(k => item.cat.toLowerCase().includes(k));
-      if (chave) $editCat.value = chave;
-      $editValor.value = item.valor;
+      const oldKey = labelToKey(item.cat);
+      if (oldKey) $editCat.value = oldKey;
+
+      // preencher valor no formato amigável
+      $editValor.value = String(item.valor).replace('.', ',');
       $editModal.style.display = 'flex';
     };
 
+    // Salvar edição
     document.getElementById('saveEdit').addEventListener('click', () => {
       if (editIndex === null) return;
       const item = dados[editIndex];
-      const novaCat = $editCat.value;
-      const novoValor = parseFloat($editValor.value);
 
-      if (isNaN(novoValor) || novoValor <= 0) return;
+      const novaCat = $editCat.value; // chave nova
+      // aceita "10,50" ou "10.50"
+      const novoValorNum = parseFloat(String($editValor.value).replace(/\./g,'').replace(',', '.'));
+      if (isNaN(novoValorNum) || novoValorNum <= 0) return;
 
-      const chaveAntiga = Object.keys(totals).find(k => item.cat.toLowerCase().includes(k));
-      if (chaveAntiga) totals[chaveAntiga] -= item.valor;
+      const oldKey = labelToKey(item.cat); // chave antiga pelo rótulo
+      // 1) tira o valor antigo da categoria antiga
+      if (oldKey && totals[oldKey] != null) {
+        totals[oldKey] = round2(totals[oldKey] - item.valor);
+      }
 
-      item.cat = document.querySelector(`#cat option[value="${novaCat}"]`).textContent;
-      item.valor = novoValor;
+      // 2) atualiza o item (rótulo + valor)
+      item.cat = keyToLabel(novaCat);
+      item.valor = round2(novoValorNum);
 
-      totals[novaCat] = +(totals[novaCat] + novoValor).toFixed(2);
+      // 3) soma o novo valor na categoria nova
+      totals[novaCat] = round2((totals[novaCat] || 0) + item.valor);
 
       editIndex = null;
       $editModal.style.display = 'none';
@@ -340,16 +360,21 @@
       editIndex = null;
     });
 
-    // excluir
+    // EXCLUIR
     window.excluir = (i) => {
       const item = dados[i];
       if (!confirm("Excluir este lançamento?")) return;
-      const chave = Object.keys(totals).find(k => item.cat.toLowerCase().includes(k));
-      if (chave) totals[chave] -= item.valor;
+
+      const key = labelToKey(item.cat);
+      if (key && totals[key] != null) {
+        totals[key] = round2(totals[key] - item.valor);
+      }
+
       dados.splice(i, 1);
       salvar(); render();
     };
 
+    // Detalhes/limpar
     document.getElementById('detalhesBtn').addEventListener('click', () => {
       $detalhesTable.style.display = $detalhesTable.style.display === 'none' ? 'table' : 'none';
     });
@@ -358,6 +383,7 @@
       if(confirm('Apagar todos os dados deste dia?')) apagar();
     });
 
+    // Campo valor (modo centavos)
     $valor.addEventListener('input', (e) => {
       const el = e.target;
       let digits = String(el.value).replace(/\D/g, '');
@@ -368,6 +394,7 @@
       el.value = (cents/100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
     });
 
+    // Navegação por data
     function mudarData(dias) {
       const atual = new Date($dataRef.value);
       atual.setDate(atual.getDate() + dias);
@@ -378,6 +405,7 @@
     $nextDay.addEventListener('click', () => mudarData(1));
     $dataRef.addEventListener('change', carregar);
 
+    // Inicial
     $valor.dataset.cents = '0';
     const hoje = new Date().toISOString().split('T')[0];
     $dataRef.value = hoje;
