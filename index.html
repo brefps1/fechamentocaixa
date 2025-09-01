@@ -46,7 +46,7 @@
   <!-- APP -->
   <div id="appBox" style="display:none;">
     <div style="text-align:right; margin-bottom:10px;">
-      <button onclick="sair()">🏃🚪 Sair</button>
+      <button onclick="sair()">🚪 Sair</button>
     </div>
 
     <div class="container">
@@ -106,7 +106,11 @@
 
         <table id="detalhesTable" style="display:none; margin-top:15px;">
           <thead>
-            <tr><th>Categoria</th><th class="right">Valor</th></tr>
+            <tr>
+              <th>Categoria</th>
+              <th class="right">Valor</th>
+              <th>Ações</th>
+            </tr>
           </thead>
           <tbody id="tbody"></tbody>
         </table>
@@ -125,7 +129,7 @@
       apiKey: "AIzaSyB9ZSQq4pmLgVcC5KMiinTh9y6GKBkaw34",
       authDomain: "caixafechamento-a0c9b.firebaseapp.com",
       projectId: "caixafechamento-a0c9b",
-      storageBucket: "caixafechamento-a0c9b.firebasestorage.app",
+      storageBucket: "caixafechamento-a0c9b.appspot.com",
       messagingSenderId: "973436778587",
       appId: "1:973436778587:web:151a3bb889460ffd65677e"
     };
@@ -176,7 +180,6 @@
     let dados = [];
     let totals = {};
 
-    // 🔑 Agora cada usuário tem sua coleção
     function getDocRef() {
       if (!currentUser) return null;
       return doc(db, "users", currentUser.uid, "caixa", $dataRef.value);
@@ -215,9 +218,16 @@
 
     function render(){
       $tbody.innerHTML = '';
-      dados.forEach(d => {
+      dados.forEach((d, i) => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${d.cat}</td><td class="right">${fmt.format(d.valor)}</td>`;
+        tr.innerHTML = `
+          <td>${d.cat}</td>
+          <td class="right">${fmt.format(d.valor)}</td>
+          <td>
+            <button onclick="editar(${i})">✏️</button>
+            <button onclick="excluir(${i})">🗑</button>
+          </td>
+        `;
         $tbody.appendChild(tr);
       });
 
@@ -232,6 +242,7 @@
       document.getElementById('t_saldo').textContent = fmt.format(entradas);
     }
 
+    // adicionar lançamento
     document.getElementById('addBtn').addEventListener('click', () => {
       const cents = parseInt($valor.dataset.cents || '0', 10);
       const valor = cents / 100;
@@ -245,6 +256,38 @@
       $valor.dataset.cents = '0'; $valor.value = '';
       render(); salvar(); $valor.focus();
     });
+
+    // editar
+    window.editar = (i) => {
+      const item = dados[i];
+      const novaCat = prompt("Nova categoria (cartao, cartao_parcelado, pix_chave, pix_maquina, convenio, prazo):", "cartao");
+      if (!novaCat || !totals.hasOwnProperty(novaCat)) return;
+
+      const novoValor = parseFloat(prompt("Novo valor:", item.valor));
+      if (isNaN(novoValor) || novoValor <= 0) return;
+
+      const chaveAntiga = Object.keys(totals).find(k => item.cat.toLowerCase().includes(k));
+      if (chaveAntiga) totals[chaveAntiga] -= item.valor;
+
+      item.cat = document.querySelector(`#cat option[value="${novaCat}"]`).textContent;
+      item.valor = novoValor;
+
+      totals[novaCat] = +(totals[novaCat] + novoValor).toFixed(2);
+
+      salvar(); render();
+    };
+
+    // excluir
+    window.excluir = (i) => {
+      const item = dados[i];
+      if (!confirm("Excluir este lançamento?")) return;
+
+      const chave = Object.keys(totals).find(k => item.cat.toLowerCase().includes(k));
+      if (chave) totals[chave] -= item.valor;
+
+      dados.splice(i, 1);
+      salvar(); render();
+    };
 
     document.getElementById('detalhesBtn').addEventListener('click', () => {
       $detalhesTable.style.display = $detalhesTable.style.display === 'none' ? 'table' : 'none';
@@ -264,7 +307,6 @@
       el.value = (cents/100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
     });
 
-    // 📅 Setas de data funcionando
     function mudarData(dias) {
       const atual = new Date($dataRef.value);
       atual.setDate(atual.getDate() + dias);
